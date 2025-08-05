@@ -204,13 +204,6 @@ src/
 
 MIT License - see LICENSE file for details
 
-## Support
-
-- Email: support@securetrack.com
-- Phone: +1 (555) 123-4567
-- Documentation: [docs.securetrack.com]
-- Issues: [GitHub Issues]
-
 ## Changelog
 
 ### v2.0.0 (Current)
