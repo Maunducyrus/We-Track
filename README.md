@@ -1,4 +1,4 @@
-# SecureTrack - Advanced Real-time Device & Vehicle Tracking System
+# We-Track - Advanced Real-time Device & Vehicle Tracking System
 
 A comprehensive tracking platform for lost devices and vehicles with real-time GPS tracking, community reporting, and advanced analytics.
 
