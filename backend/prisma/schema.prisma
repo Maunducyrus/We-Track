@@ -1,15 +1,293 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  POLICE
+  ADMIN
+}
+
+enum ItemStatus {
+  LOST
+  FOUND
+  RETURNED
+}
+
+enum DeviceType {
+  PHONE
+  LAPTOP
+  TABLET
+  OTHER
+}
+
+enum LocationSource {
+  GPS
+  NETWORK
+  MANUAL
+  WITNESS
+}
+
+enum AlertType {
+  PANIC
+  THEFT
+  ACCIDENT
+  MEDICAL
+  FIRE
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  PENDING
+  ACKNOWLEDGED
+  RESPONDING
+  RESOLVED
+}
+
+enum TrackingRequestType {
+  EMERGENCY
+  COURT_ORDER
+  CONSENT
+  LOST_DEVICE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole  @default(USER)
+  phone         String?
+  avatarUrl     String?   @map("avatar_url")
+  isActive      Boolean   @default(true) @map("is_active")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  lastLogin     DateTime? @map("last_login")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  devices       Device[]
+  vehicles      Vehicle[]
+  reports       Report[]
+  notifications Notification[]
+  emergencyAlerts EmergencyAlert[]
+  trackingRequests MobileTrackingRequest[]
+
+  @@map("users")
+}
+
+model Device {
+  id               String      @id @default(cuid())
+  name             String
+  type             DeviceType
+  brand            String
+  model            String
+  serialNumber     String      @map("serial_number")
+  imei             String?
+  phoneNumber      String?     @map("phone_number")
+  color            String?
+  description      String?
+  status           ItemStatus  @default(LOST)
+  reportedBy       String      @map("reported_by")
+  reportedAt       DateTime    @default(now()) @map("reported_at")
+  lastKnownLocationId String?  @map("last_known_location_id")
+  currentLocationId   String?  @map("current_location_id")
+  photos           String[]
+  isActive         Boolean     @default(true) @map("is_active")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user             User        @relation(fields: [reportedBy], references: [id])
+  lastKnownLocation Location? @relation("DeviceLastKnownLocation", fields: [lastKnownLocationId], references: [id])
+  currentLocation   Location? @relation("DeviceCurrentLocation", fields: [currentLocationId], references: [id])
+  reports          Report[]
+  trackingUpdates  TrackingUpdate[]
+
+  @@map("devices")
+}
+
+model Vehicle {
+  id               String      @id @default(cuid())
+  numberPlate      String      @map("number_plate")
+  make             String
+  model            String
+  year             Int?
+  color            String
+  chassisNumber    String?     @map("chassis_number")
+  engineNumber     String?     @map("engine_number")
+  description      String?
+  status           ItemStatus  @default(LOST)
+  reportedBy       String      @map("reported_by")
+  reportedAt       DateTime    @default(now()) @map("reported_at")
+  lastKnownLocationId String?  @map("last_known_location_id")
+  currentLocationId   String?  @map("current_location_id")
+  photos           String[]
+  isActive         Boolean     @default(true) @map("is_active")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user             User        @relation(fields: [reportedBy], references: [id])
+  lastKnownLocation Location? @relation("VehicleLastKnownLocation", fields: [lastKnownLocationId], references: [id])
+  currentLocation   Location? @relation("VehicleCurrentLocation", fields: [currentLocationId], references: [id])
+  reports          Report[]
+  trackingUpdates  TrackingUpdate[]
+
+  @@map("vehicles")
+}
+
+model Location {
+  id        String         @id @default(cuid())
+  latitude  Float
+  longitude Float
+  address   String?
+  accuracy  Float?
+  source    LocationSource @default(GPS)
+  timestamp DateTime       @default(now())
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  devicesLastKnown  Device[] @relation("DeviceLastKnownLocation")
+  devicesCurrent    Device[] @relation("DeviceCurrentLocation")
+  vehiclesLastKnown Vehicle[] @relation("VehicleLastKnownLocation")
+  vehiclesCurrent   Vehicle[] @relation("VehicleCurrentLocation")
+  trackingUpdates   TrackingUpdate[]
+  reports           Report[]
+  emergencyAlerts   EmergencyAlert[]
+
+  @@map("locations")
+}
+
+model Report {
+  id          String      @id @default(cuid())
+  type        String      // 'device' | 'vehicle'
+  itemId      String      @map("item_id")
+  reportType  String      @map("report_type") // 'lost' | 'found' | 'sighting'
+  reportedBy  String      @map("reported_by")
+  locationId  String?     @map("location_id")
+  description String
+  photos      String[]
+  contactInfo String?     @map("contact_info")
+  status      String      @default("pending") // 'pending' | 'verified' | 'resolved'
+  assignedTo  String?     @map("assigned_to")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user     User      @relation(fields: [reportedBy], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+  device   Device?   @relation(fields: [itemId], references: [id])
+  vehicle  Vehicle?  @relation(fields: [itemId], references: [id])
+
+  @@map("reports")
+}
+
+model TrackingUpdate {
+  id         String   @id @default(cuid())
+  itemId     String   @map("item_id")
+  itemType   String   @map("item_type") // 'device' | 'vehicle'
+  locationId String   @map("location_id")
+  source     String
+  confidence Float    @default(1.0)
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id])
+  device   Device?  @relation(fields: [itemId], references: [id])
+  vehicle  Vehicle? @relation(fields: [itemId], references: [id])
+
+  @@map("tracking_updates")
+}
+
+model Notification {
+  id       String           @id @default(cuid())
+  userId   String           @map("user_id")
+  title    String
+  message  String
+  type     String           @default("info") // 'info' | 'success' | 'warning' | 'error'
+  priority AlertPriority    @default(MEDIUM)
+  isRead   Boolean          @default(false) @map("is_read")
+  itemId   String?          @map("item_id")
+  itemType String?          @map("item_type")
+  data     Json?
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model EmergencyAlert {
+  id          String        @id @default(cuid())
+  type        AlertType
+  priority    AlertPriority @default(MEDIUM)
+  locationId  String        @map("location_id")
+  description String
+  reportedBy  String        @map("reported_by")
+  assignedTo  String?       @map("assigned_to")
+  status      AlertStatus   @default(PENDING)
+  responseTime Int?         @map("response_time") // in seconds
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id])
+  user     User     @relation(fields: [reportedBy], references: [id])
+
+  @@map("emergency_alerts")
+}
+
+model MobileTrackingRequest {
+  id              String             @id @default(cuid())
+  mobileNumber    String             @map("mobile_number")
+  requestType     TrackingRequestType @map("request_type")
+  priority        AlertPriority      @default(MEDIUM)
+  officerId       String             @map("officer_id")
+  courtOrderNumber String?           @map("court_order_number")
+  emergencyCode   String?            @map("emergency_code")
+  consentToken    String?            @map("consent_token")
+  success         Boolean            @default(false)
+  locationId      String?            @map("location_id")
+  network         String?
+  accuracy        Float?
+  error           String?
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  officer  User      @relation(fields: [officerId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@map("mobile_tracking_requests")
+}
+
+model SecurityOfficer {
+  id          String   @id @default(cuid())
+  name        String
+  badge       String   @unique
+  department  String   // 'police' | 'admin_police' | 'nis' | 'private_security'
+  rank        String
+  station     String
+  county      String
+  phone       String
+  email       String
+  isActive    Boolean  @default(true) @map("is_active")
+  permissions String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("security_officers")
 }
